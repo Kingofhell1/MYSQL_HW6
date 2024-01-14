@@ -84,104 +84,58 @@ Query OK, 0 rows affected (0.00 sec)
 
 
   
-*    mysql> CREATE PROCEDURE users_5
-    -> (/n
-    
-    ->  IN id_user_find INT
-    -> )
-    -> BEGIN
-    ->
-    ->     SELECT t.id
-    ->     FROM
-    ->     (
-    ->          SELECT id
-    ->          FROM users u
-    ->          INNER JOIN profiles p
-    ->          ON u.id = p.user_id
-    ->          AND u.id <> id_user_find
-    ->          AND (
-    ->                  SELECT p1.hometown
-    ->                  FROM users u1
-    ->                  INNER JOIN profiles p1
-    ->                  ON u1.id = p1.user_id
-    ->                  AND u1.id = id_user_find
-    ->          ) = p.hometown
-    ->          UNION
-    ->          SELECT DISTINCT u.id
-    ->          FROM users u
-    ->          INNER JOIN users_communities uc
-    ->          ON u.id = uc.user_id
-    ->          WHERE uc.community_id IN
-    ->          (
-    ->                  SELECT community_id
-    ->                  FROM users_communities
-    ->                  WHERE users_communities.user_id = id_user_find
-    ->          )
-    ->          UNION
-    ->          SELECT id
-    ->          FROM users
-    ->          WHERE users.id IN (
-    ->                  (
-    ->                          SELECT initiator_user_id AS id
-    ->                          FROM friend_requests
-    ->                          WHERE status='approved'
-    ->                          AND target_user_id IN (
-    ->                                  SELECT initiator_user_id AS id
-    ->                                  FROM friend_requests
-    ->                                  WHERE target_user_id = id_user_find AND status='approved'
-    ->                                  UNION ALL
-    ->                                  SELECT target_user_id
-    ->                                  FROM friend_requests
-    ->                                  WHERE initiator_user_id = id_user_find AND status='approved'
-    ->                          )
-    ->                          UNION
-    ->                          SELECT target_user_id
-    ->                          FROM friend_requests
-    ->                          WHERE status='approved'
-    ->                          AND initiator_user_id IN (
-    ->                                  SELECT initiator_user_id AS id
-    ->                                  FROM friend_requests
-    ->                                  WHERE target_user_id = id_user_find AND status='approved'
-    ->                                  UNION ALL
-    ->                                  SELECT target_user_id
-    ->                                  FROM friend_requests
-    ->                                  WHERE initiator_user_id = id_user_find AND status='approved'
-    ->                          )
-    ->                  )
-    ->          )
-    ->  ) t
-    ->     ORDER BY RAND()
-    ->     LIMIT 5;
-    ->
-    -> END //
-Query OK, 0 rows affected (0.02 sec)
+*     mysql> DELIMITER //
+      mysql> CREATE PROCEDURE find_person(IN find_id int)
+        -> BEGIN
+        ->   SELECT b.user_id, u.firstname, u.lastname
+        ->   FROM
+        ->     (SELECT user_id FROM
+        ->       (SELECT p.user_id
+        ->         FROM profiles p
+        ->         WHERE p.hometown = (SELECT hometown FROM profiles WHERE PROFILES.user_id = find_id)
+        ->       UNION
+        ->       SELECT id
+        ->         FROM communities
+        ->         WHERE id IN (SELECT community_id FROM users_communities WHERE user_id = find_id)) a
+        ->     UNION
+        ->     SELECT target_user_id
+        ->       FROM friend_requests
+        ->       WHERE initiator_user_id IN (
+        ->         SELECT
+        ->            target_user_id
+        ->          FROM friend_requests
+        ->          WHERE initiator_user_id = find_id)) b
+        ->   LEFT JOIN users u
+        ->     ON b.user_id = u.id
+        ->   ORDER BY RAND()
+        ->   LIMIT 5;
+        -> END //
+------------------------------------------------------
+      mysql> CALL find_person(3);
+            +---------+-----------+----------+
+            | user_id | firstname | lastname |
+            +---------+-----------+----------+
+            |       3 | Unique    | Windler  |
+            |       2 | Frederik  | Upton    |
+            |       5 | Frederick | Effertz  |
+            |       8 | Jaida     | Kilback  |
+            |      10 | Jordyn    | Jerde    |
+            +---------+-----------+----------+
+5 rows in set (0.04 sec)
 
-    mysql> DELIMITER ;
-    mysql> CALL users_5(4);
-        +----+
-        | id |
-        +----+
-        |  1 |
-        |  9 |
-        |  4 |
-        | 10 |
-        |  2 |
-        +----+
-5 rows in set (0.00 sec)
 
 Query OK, 0 rows affected (0.01 sec)
 
-     mysql> CALL users_5(6);
-        +----+
-        | id |
-        +----+
-        |  9 |
-        |  8 |
-        | 10 |
-        |  7 |
-        |  6 |
-        +----+
-5 rows in set (0.00 sec)
+     mysql> CALL find_person(5);
+    +---------+-----------+----------+
+    | user_id | firstname | lastname |
+    +---------+-----------+----------+
+    |       1 | Reuben    | Nienow   |
+    |       2 | Frederik  | Upton    |
+    |       6 | Victoria  | Medhurst |
+    |      10 | Jordyn    | Jerde    |
+    |       3 | Unique    | Windler  |
+    +---------+-----------+----------+
 
 Query OK, 0 rows affected (0.01 sec)
 
